@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "aMWdW/X7h6s=",
+  "success": true,
+  "projectFilePath": "D:\\WinNotch\\WinNotch.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\iambi\\.nuget\\packages\\microsoft.windows.sdk.net.ref\\10.0.19041.57\\microsoft.windows.sdk.net.ref.10.0.19041.57.nupkg.sha512"
+  ],
+  "logs": []
+}
