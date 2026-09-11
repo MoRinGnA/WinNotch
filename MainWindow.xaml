@@ -134,44 +134,40 @@
     <!-- Root grid: full screen overlay -->
     <Grid>
 
-        <!-- Bezel ambient light: 4 edge rectangles -->
-        <Rectangle x:Name="BezelTop" Height="6" VerticalAlignment="Top" HorizontalAlignment="Stretch"
-                   IsHitTestVisible="False" Opacity="0">
-            <Rectangle.Fill><SolidColorBrush x:Name="BezelTopBrush" Color="#4A90E2"/></Rectangle.Fill>
-            <Rectangle.Effect><BlurEffect Radius="50"/></Rectangle.Effect>
-        </Rectangle>
-
-        <Rectangle x:Name="BezelBottom" Height="6" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
-                   IsHitTestVisible="False" Opacity="0">
-            <Rectangle.Fill><SolidColorBrush x:Name="BezelBottomBrush" Color="#4A90E2"/></Rectangle.Fill>
-            <Rectangle.Effect><BlurEffect Radius="50"/></Rectangle.Effect>
-        </Rectangle>
-
-        <Rectangle x:Name="BezelLeft" Width="6" VerticalAlignment="Stretch" HorizontalAlignment="Left"
-                   IsHitTestVisible="False" Opacity="0">
-            <Rectangle.Fill><SolidColorBrush x:Name="BezelLeftBrush" Color="#4A90E2"/></Rectangle.Fill>
-            <Rectangle.Effect><BlurEffect Radius="50"/></Rectangle.Effect>
-        </Rectangle>
-
-        <Rectangle x:Name="BezelRight" Width="6" VerticalAlignment="Stretch" HorizontalAlignment="Right"
-                   IsHitTestVisible="False" Opacity="0">
-            <Rectangle.Fill><SolidColorBrush x:Name="BezelRightBrush" Color="#4A90E2"/></Rectangle.Fill>
-            <Rectangle.Effect><BlurEffect Radius="50"/></Rectangle.Effect>
-        </Rectangle>
-
         <!-- Notch container: centered at top -->
         <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0">
 
-            <!-- Notch ambient glow layer (sits behind NotchBorder) -->
-            <Border x:Name="NotchGlowBorder" Width="100" Height="38" CornerRadius="19"
-                    IsHitTestVisible="False" Opacity="0">
-                <Border.Background>
-                    <SolidColorBrush x:Name="NotchGlowFill" Color="#4A90E2" Opacity="0.01"/>
-                </Border.Background>
-                <Border.Effect>
-                    <DropShadowEffect x:Name="NotchAmbientEffect" Color="#4A90E2" BlurRadius="50" ShadowDepth="0" Opacity="0.9"/>
-                </Border.Effect>
-            </Border>
+            <!-- Notch ambient glow system: dual-layer aura + rim accent -->
+            <Grid x:Name="NotchAmbientContainer" IsHitTestVisible="False" Opacity="0"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                <!-- Layer 1: Wide Diffuse Aura (소프트 오로라 확산광) -->
+                <Border x:Name="NotchAmbientAura" Width="170" Height="62" CornerRadius="29">
+                    <Border.Background>
+                        <RadialGradientBrush Center="0.5,0.45" GradientOrigin="0.5,0.45" RadiusX="0.65" RadiusY="0.75">
+                            <GradientStop x:Name="AuraColorStop1" Color="#804A90E2" Offset="0.0"/>
+                            <GradientStop x:Name="AuraColorStop2" Color="#308E44AD" Offset="0.55"/>
+                            <GradientStop Color="#00000000" Offset="1.0"/>
+                        </RadialGradientBrush>
+                    </Border.Background>
+                    <Border.Effect>
+                        <BlurEffect Radius="40"/>
+                    </Border.Effect>
+                </Border>
+
+                <!-- Layer 2: Precision Rim Light (노치 외곽을 감싸는 선명한 네온 림) -->
+                <Border x:Name="NotchAmbientRim" Width="104" Height="42" CornerRadius="21"
+                        BorderThickness="1.5">
+                    <Border.BorderBrush>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop x:Name="RimColorStop1" Color="#C04A90E2" Offset="0.0"/>
+                            <GradientStop x:Name="RimColorStop2" Color="#908E44AD" Offset="1.0"/>
+                        </LinearGradientBrush>
+                    </Border.BorderBrush>
+                    <Border.Effect>
+                        <BlurEffect Radius="8"/>
+                    </Border.Effect>
+                </Border>
+            </Grid>
 
             <!-- Main notch border -->
             <Border x:Name="NotchBorder" Width="100" Height="38"

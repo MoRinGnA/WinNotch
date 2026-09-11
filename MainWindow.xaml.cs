@@ -117,7 +117,6 @@ namespace WinNotch
         private DispatcherTimer? _volumeHudTimer;
         private Storyboard? _eqStoryboard;
         private Storyboard? _glassLightStoryboard;
-        private Storyboard? _ambientBreathStoryboard;
 
         private ViewMode _currentViewMode = ViewMode.IdleCompact;
         private NotchTheme _currentTheme = NotchTheme.Dark;
@@ -355,16 +354,20 @@ namespace WinNotch
             _glassLightStoryboard = null;
         }
 
-        private void SetAmbientColor(Color color)
+        private void SetAmbientColor(Color color, Color? secondaryColor = null)
         {
-            _currentAmbientColor = color;
+            Color primary = EnhanceAmbientColor(color);
+            Color secondary = secondaryColor ?? GenerateShiftedColor(primary, 32);
 
-            BezelTopBrush.Color = color;
-            BezelBottomBrush.Color = color;
-            BezelLeftBrush.Color = color;
-            BezelRightBrush.Color = color;
+            _currentAmbientColor = primary;
 
-            NotchAmbientEffect.Color = color;
+            // Update Layer 1: Wide Diffuse Aura
+            AuraColorStop1.Color = Color.FromArgb(140, primary.R, primary.G, primary.B);
+            AuraColorStop2.Color = Color.FromArgb(45, secondary.R, secondary.G, secondary.B);
+
+            // Update Layer 2: Precision Rim Light
+            RimColorStop1.Color = Color.FromArgb(200, primary.R, primary.G, primary.B);
+            RimColorStop2.Color = Color.FromArgb(160, secondary.R, secondary.G, secondary.B);
 
             if (!_ambientActive)
             {
@@ -378,54 +381,57 @@ namespace WinNotch
             _ambientActive = false;
             StopAmbientBreathAnimation();
 
-            var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(600));
-            BezelTop.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            BezelBottom.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            BezelLeft.BeginAnimation(UIElement.OpacityProperty, fadeOut);
-            BezelRight.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+            var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(400));
+            NotchAmbientContainer.BeginAnimation(UIElement.OpacityProperty, fadeOut);
         }
 
         private void StartAmbientBreathAnimation()
         {
             StopAmbientBreathAnimation();
 
-            _ambientBreathStoryboard = new Storyboard();
-
-            Rectangle[] edges = { BezelTop, BezelBottom, BezelLeft, BezelRight };
-            double[] minOpacity = { 0.35, 0.20, 0.25, 0.25 };
-            double[] maxOpacity = { 0.75, 0.45, 0.55, 0.55 };
-            double[] durations = { 2.0, 2.5, 2.2, 2.3 };
-
-            for (int i = 0; i < edges.Length; i++)
-            {
-                var anim = new DoubleAnimation(minOpacity[i], maxOpacity[i], TimeSpan.FromSeconds(durations[i]))
-                {
-                    AutoReverse = true,
-                    RepeatBehavior = RepeatBehavior.Forever
-                };
-                Timeline.SetDesiredFrameRate(anim, 30);
-                Storyboard.SetTarget(anim, edges[i]);
-                Storyboard.SetTargetProperty(anim, new PropertyPath(UIElement.OpacityProperty));
-                _ambientBreathStoryboard.Children.Add(anim);
-            }
-
-            var notchGlowAnim = new DoubleAnimation(0.5, 1.0, TimeSpan.FromSeconds(1.8))
+            var breathAnim = new DoubleAnimation(0.48, 0.95, TimeSpan.FromSeconds(2.6))
             {
                 AutoReverse = true,
-                RepeatBehavior = RepeatBehavior.Forever
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
             };
-            Timeline.SetDesiredFrameRate(notchGlowAnim, 30);
-            Storyboard.SetTarget(notchGlowAnim, NotchGlowBorder);
-            Storyboard.SetTargetProperty(notchGlowAnim, new PropertyPath(UIElement.OpacityProperty));
-            _ambientBreathStoryboard.Children.Add(notchGlowAnim);
-
-            _ambientBreathStoryboard.Begin();
+            Timeline.SetDesiredFrameRate(breathAnim, 30);
+            NotchAmbientContainer.BeginAnimation(UIElement.OpacityProperty, breathAnim);
         }
 
         private void StopAmbientBreathAnimation()
         {
-            _ambientBreathStoryboard?.Stop();
-            _ambientBreathStoryboard = null;
+            NotchAmbientContainer.BeginAnimation(UIElement.OpacityProperty, null);
+            NotchAmbientContainer.Opacity = 0;
+        }
+
+        private void UpdateGlowDimensions(double targetWidth, double targetHeight, double targetRadius, Duration duration, IEasingFunction ease)
+        {
+            double auraW = targetWidth + 70;
+            double auraH = targetHeight + 24;
+            double auraRadius = targetRadius + 10;
+
+            double rimW = targetWidth + 4;
+            double rimH = targetHeight + 4;
+            double rimRadius = targetRadius + 2;
+
+            NotchAmbientAura.CornerRadius = new CornerRadius(auraRadius);
+            NotchAmbientRim.CornerRadius = new CornerRadius(rimRadius);
+
+            var auraWAnim = new DoubleAnimation { To = auraW, Duration = duration, EasingFunction = ease };
+            var auraHAnim = new DoubleAnimation { To = auraH, Duration = duration, EasingFunction = ease };
+            var rimWAnim = new DoubleAnimation { To = rimW, Duration = duration, EasingFunction = ease };
+            var rimHAnim = new DoubleAnimation { To = rimH, Duration = duration, EasingFunction = ease };
+
+            Timeline.SetDesiredFrameRate(auraWAnim, 60);
+            Timeline.SetDesiredFrameRate(auraHAnim, 60);
+            Timeline.SetDesiredFrameRate(rimWAnim, 60);
+            Timeline.SetDesiredFrameRate(rimHAnim, 60);
+
+            NotchAmbientAura.BeginAnimation(Border.WidthProperty, auraWAnim);
+            NotchAmbientAura.BeginAnimation(Border.HeightProperty, auraHAnim);
+            NotchAmbientRim.BeginAnimation(Border.WidthProperty, rimWAnim);
+            NotchAmbientRim.BeginAnimation(Border.HeightProperty, rimHAnim);
         }
 
         private double CalculateCompactWidth()
@@ -504,20 +510,17 @@ namespace WinNotch
 
             SetViewActive(activeView, duration, ease);
             NotchBorder.CornerRadius = new CornerRadius(targetRadius);
-            NotchGlowBorder.CornerRadius = new CornerRadius(targetRadius);
 
             DoubleAnimation widthAnim = new DoubleAnimation { To = targetWidth, Duration = duration, EasingFunction = ease };
             DoubleAnimation heightAnim = new DoubleAnimation { To = targetHeight, Duration = duration, EasingFunction = ease };
-            DoubleAnimation glowWidthAnim = new DoubleAnimation { To = targetWidth, Duration = duration, EasingFunction = ease };
-            DoubleAnimation glowHeightAnim = new DoubleAnimation { To = targetHeight, Duration = duration, EasingFunction = ease };
 
             Timeline.SetDesiredFrameRate(widthAnim, 60);
             Timeline.SetDesiredFrameRate(heightAnim, 60);
 
             NotchBorder.BeginAnimation(Border.WidthProperty, widthAnim);
             NotchBorder.BeginAnimation(Border.HeightProperty, heightAnim);
-            NotchGlowBorder.BeginAnimation(Border.WidthProperty, glowWidthAnim);
-            NotchGlowBorder.BeginAnimation(Border.HeightProperty, glowHeightAnim);
+
+            UpdateGlowDimensions(targetWidth, targetHeight, targetRadius, duration, ease);
 
             DoubleAnimation mainContainerHeightAnim = new DoubleAnimation { To = targetHeight, Duration = duration, EasingFunction = ease };
             Timeline.SetDesiredFrameRate(mainContainerHeightAnim, 60);
@@ -725,13 +728,47 @@ namespace WinNotch
         {
             int hash = Math.Abs(title.GetHashCode());
             double hue = (hash % 360);
-            double saturation = 0.6 + (hash % 30) / 100.0;
-            double lightness = 0.55 + (hash % 20) / 100.0;
-            return HslToColor(hue, saturation, lightness);
+            return HslToColor(hue, 0.82, 0.56);
+        }
+
+        private static void ColorToHsl(Color c, out double h, out double s, out double l)
+        {
+            double r = c.R / 255.0;
+            double g = c.G / 255.0;
+            double b = c.B / 255.0;
+
+            double max = Math.Max(r, Math.Max(g, b));
+            double min = Math.Min(r, Math.Min(g, b));
+            double delta = max - min;
+
+            l = (max + min) / 2.0;
+
+            if (delta < 0.00001)
+            {
+                h = 0;
+                s = 0;
+            }
+            else
+            {
+                s = l <= 0.5 ? delta / (max + min) : delta / (2.0 - max - min);
+
+                if (Math.Abs(r - max) < 0.00001)
+                    h = (g - b) / delta + (g < b ? 6.0 : 0.0);
+                else if (Math.Abs(g - max) < 0.00001)
+                    h = (b - r) / delta + 2.0;
+                else
+                    h = (r - g) / delta + 4.0;
+
+                h *= 60.0;
+            }
         }
 
         private static Color HslToColor(double h, double s, double l)
         {
+            h = (h % 360 + 360) % 360;
+            s = Math.Clamp(s, 0.0, 1.0);
+            l = Math.Clamp(l, 0.0, 1.0);
+
             double c = (1 - Math.Abs(2 * l - 1)) * s;
             double x = c * (1 - Math.Abs((h / 60) % 2 - 1));
             double m = l - c / 2;
@@ -745,17 +782,43 @@ namespace WinNotch
             else { r = c; b = x; }
 
             return Color.FromRgb(
-                (byte)((r + m) * 255),
-                (byte)((g + m) * 255),
-                (byte)((b + m) * 255));
+                (byte)Math.Clamp((r + m) * 255, 0, 255),
+                (byte)Math.Clamp((g + m) * 255, 0, 255),
+                (byte)Math.Clamp((b + m) * 255, 0, 255));
+        }
+
+        private static Color EnhanceAmbientColor(Color c)
+        {
+            ColorToHsl(c, out double h, out double s, out double l);
+
+            // 흑백이거나 채도가 극도로 낮은 경우 (탁한 멍자국 방지: 스타일리시한 네온 바이올렛/블루 톤)
+            if (s < 0.18)
+            {
+                return HslToColor(230, 0.80, 0.56);
+            }
+
+            // 채도 부스팅: 앰비언트 광원은 생생해야 고급스러움
+            double boostedS = Math.Clamp(Math.Max(s * 1.45, 0.78), 0.75, 0.95);
+
+            // 명도 튜닝: 너무 어둡거나 하얗게 날아가지 않고 빛답게 빛나는 최적 구간(0.50 ~ 0.58)
+            double tunedL = Math.Clamp(l, 0.50, 0.58);
+
+            return HslToColor(h, boostedS, tunedL);
+        }
+
+        private static Color GenerateShiftedColor(Color primary, double hueShiftDegrees)
+        {
+            ColorToHsl(primary, out double h, out double s, out double l);
+            double shiftedH = (h + hueShiftDegrees) % 360;
+            return HslToColor(shiftedH, Math.Max(0.75, s), Math.Clamp(l * 0.96, 0.46, 0.56));
         }
 
         private Color GetDominantColor(BitmapSource bitmap)
         {
             try
             {
-                int targetW = Math.Min(bitmap.PixelWidth, 40);
-                int targetH = Math.Min(bitmap.PixelHeight, 40);
+                int targetW = Math.Min(bitmap.PixelWidth, 48);
+                int targetH = Math.Min(bitmap.PixelHeight, 48);
                 var scaled = new TransformedBitmap(bitmap, new ScaleTransform(
                     (double)targetW / bitmap.PixelWidth,
                     (double)targetH / bitmap.PixelHeight));
@@ -767,10 +830,8 @@ namespace WinNotch
                 byte[] pixels = new byte[height * stride];
                 formatConverted.CopyPixels(pixels, stride, 0);
 
-                long totalR = 0, totalG = 0, totalB = 0;
-                long satR = 0, satG = 0, satB = 0;
-                int satCount = 0;
-                int pixelCount = width * height;
+                double totalWeight = 0;
+                double weightedR = 0, weightedG = 0, weightedB = 0;
 
                 for (int i = 0; i < pixels.Length; i += 4)
                 {
@@ -778,35 +839,31 @@ namespace WinNotch
                     byte pg = pixels[i + 1];
                     byte pr = pixels[i + 2];
 
-                    totalB += pb;
-                    totalG += pg;
-                    totalR += pr;
-
                     int max = Math.Max(pr, Math.Max(pg, pb));
                     int min = Math.Min(pr, Math.Min(pg, pb));
                     int delta = max - min;
 
-                    if (delta > 30 && max > 50)
+                    // 극단적인 블랙/화이트 제외하고 채도와 명도에 높은 가중치 부여
+                    if (max > 35 && min < 240)
                     {
-                        satR += pr;
-                        satG += pg;
-                        satB += pb;
-                        satCount++;
+                        double weight = (delta * delta) / 1000.0 + (max / 255.0);
+                        weightedR += pr * weight;
+                        weightedG += pg * weight;
+                        weightedB += pb * weight;
+                        totalWeight += weight;
                     }
                 }
 
-                if (satCount > pixelCount / 10)
+                if (totalWeight > 0.1)
                 {
-                    return Color.FromRgb(
-                        (byte)(satR / satCount),
-                        (byte)(satG / satCount),
-                        (byte)(satB / satCount));
+                    Color rawColor = Color.FromRgb(
+                        (byte)Math.Clamp(weightedR / totalWeight, 0, 255),
+                        (byte)Math.Clamp(weightedG / totalWeight, 0, 255),
+                        (byte)Math.Clamp(weightedB / totalWeight, 0, 255));
+                    return EnhanceAmbientColor(rawColor);
                 }
 
-                return Color.FromRgb(
-                    (byte)(totalR / pixelCount),
-                    (byte)(totalG / pixelCount),
-                    (byte)(totalB / pixelCount));
+                return HslToColor(220, 0.85, 0.55);
             }
             catch
             {
@@ -1020,8 +1077,11 @@ namespace WinNotch
                     double newWidth = CalculateCompactWidth();
                     if (Math.Abs(NotchBorder.Width - newWidth) > 5)
                     {
-                        DoubleAnimation widthAnim = new DoubleAnimation { To = newWidth, Duration = TimeSpan.FromMilliseconds(200), EasingFunction = new QuadraticEase() };
+                        var animDuration = TimeSpan.FromMilliseconds(200);
+                        var animEase = new QuadraticEase();
+                        DoubleAnimation widthAnim = new DoubleAnimation { To = newWidth, Duration = animDuration, EasingFunction = animEase };
                         NotchBorder.BeginAnimation(Border.WidthProperty, widthAnim);
+                        UpdateGlowDimensions(newWidth, 38, 19, animDuration, animEase);
                     }
                 }
             }

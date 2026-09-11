@@ -24,3 +24,4 @@ D:\WinNotch\bin\Debug\net10.0-windows10.0.19041.0\WinNotch.dll
 D:\WinNotch\bin\Debug\net10.0-windows10.0.19041.0\WinNotch.pdb
 D:\WinNotch\obj\Debug\net10.0-windows10.0.19041.0\WinNotch.genruntimeconfig.cache
 D:\WinNotch\obj\Debug\net10.0-windows10.0.19041.0\ref\WinNotch.dll
+D:\WinNotch\obj\Debug\net10.0-windows10.0.19041.0\WinNotch.sourcelink.json
