@@ -343,7 +343,7 @@
                             </Grid>
 
                             <Rectangle x:Name="LyricsDivider" Grid.Column="1"
-                                       Fill="#20FFFFFF" Width="1" Margin="18,4,20,4" Visibility="Collapsed"/>
+                                       Fill="#12FFFFFF" Width="1" Margin="16,10,18,10" Visibility="Collapsed"/>
 
                             <Grid x:Name="LyricsContainer" Grid.Column="2" VerticalAlignment="Center" Visibility="Collapsed">
                                 <StackPanel x:Name="LyricsPanel">
@@ -351,11 +351,10 @@
                                                FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                Margin="0,0,0,6"
                                                FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
-                                    <Border Background="#8A000000" CornerRadius="8" Padding="8,6,8,6" Margin="0,0,0,6">
-                                        <TextBlock x:Name="CurrentLyricText" Text="" Foreground="#FFFFFF"
-                                                   FontSize="14" FontWeight="Bold" TextWrapping="Wrap" MaxHeight="44"
-                                                   FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
-                                    </Border>
+                                    <TextBlock x:Name="CurrentLyricText" Text="" Foreground="#FFFFFF"
+                                               FontSize="15" FontWeight="Bold" TextWrapping="Wrap" MaxHeight="44"
+                                               Margin="0,0,0,4"
+                                               FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
                                     <TextBlock x:Name="NextLyricText" Text="" Foreground="#88888C"
                                                FontSize="12" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                                FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
@@ -391,58 +390,6 @@
                                        FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
                         </Grid>
                     </Border>
-
-                    <!-- Liquid glass overlay layers -->
-                    <Grid x:Name="GlassOverlayLayers" IsHitTestVisible="False" Visibility="Collapsed">
-                        <Border CornerRadius="{Binding ElementName=NotchBorder, Path=CornerRadius}">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                                    <GradientStop Color="#1FFFFFFF" Offset="0.0"/>
-                                    <GradientStop Color="#00FFFFFF" Offset="0.45"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                        </Border>
-                        <Border CornerRadius="{Binding ElementName=NotchBorder, Path=CornerRadius}" BorderThickness="1">
-                            <Border.BorderBrush>
-                                <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                                    <GradientStop Color="#40FFFFFF" Offset="0.0"/>
-                                    <GradientStop Color="#00FFFFFF" Offset="0.5"/>
-                                    <GradientStop Color="#30000000" Offset="1.0"/>
-                                </LinearGradientBrush>
-                            </Border.BorderBrush>
-                        </Border>
-                        <Grid ClipToBounds="True">
-                            <Ellipse x:Name="GlassLightSpot" Width="220" Height="220"
-                                     Fill="{StaticResource GlassLightBrush}" RenderTransformOrigin="0.5,0.5">
-                                <Ellipse.RenderTransform>
-                                    <RotateTransform x:Name="GlassLightRotate" Angle="0"/>
-                                </Ellipse.RenderTransform>
-                            </Ellipse>
-                        </Grid>
-                        <Border VerticalAlignment="Top" Height="1" Margin="12,0,12,0">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#00FFFFFF" Offset="0.0"/>
-                                    <GradientStop Color="#50FFFFFF" Offset="0.5"/>
-                                    <GradientStop Color="#00FFFFFF" Offset="1.0"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                        </Border>
-                    </Grid>
-
-                    <!-- Theme toggle button -->
-                    <Button x:Name="ThemeToggleButton"
-                            Style="{StaticResource AppleButton}"
-                            Click="ThemeToggleButton_Click"
-                            Width="30" Height="30"
-                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                            Margin="0,0,10,10"
-                            Opacity="0" IsHitTestVisible="False"
-                            Cursor="Hand">
-                        <Path x:Name="ThemeToggleIcon"
-                              Data="M9,21C9,21.55 9.45,22 10,22H14C14.55,22 15,21.55 15,21V20H9V21M12,2C8.14,2 5,5.14 5,9C5,11.38 6.19,13.47 8,14.74V17C8,17.55 8.45,18 9,18H15C15.55,18 16,17.55 16,17V14.74C17.81,13.47 19,11.38 19,9C19,5.14 15.86,2 12,2Z"
-                              Fill="#8E8E93" Width="16" Height="16" Stretch="Uniform"/>
-                    </Button>
 
                 </Grid>
             </Border>

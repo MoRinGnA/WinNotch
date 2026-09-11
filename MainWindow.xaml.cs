@@ -22,8 +22,6 @@ namespace WinNotch
     {
         private enum ViewMode { IdleCompact, IdleExpanded, MediaCompact, MediaExpanded, VolumeHud }
 
-        private enum NotchTheme { Dark, LiquidGlass }
-
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
         private const int WM_NCHITTEST = 0x0084;
@@ -37,16 +35,6 @@ namespace WinNotch
         [DllImport("user32.dll")]
         private static extern int SetWindowLong(IntPtr hwnd, int index, int newStyle);
 
-        private enum AccentState
-        {
-            ACCENT_DISABLED = 0,
-            ACCENT_ENABLE_GRADIENT = 1,
-            ACCENT_ENABLE_TRANSPARENTGRADIENT = 2,
-            ACCENT_ENABLE_BLURBEHIND = 3,
-            ACCENT_ENABLE_ACRYLICBLURBEHIND = 4,
-            ACCENT_ENABLE_HOSTBACKDROP = 5
-        }
-
         private const int WM_CLIPBOARDUPDATE = 0x031D;
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -57,57 +45,6 @@ namespace WinNotch
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
 
-        private void EnableAcrylicBlur(bool enable)
-        {
-            IntPtr hwnd = new WindowInteropHelper(this).Handle;
-            if (hwnd == IntPtr.Zero) return;
-
-            var accent = new AccentPolicy
-            {
-                AccentState = enable ? AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND : AccentState.ACCENT_DISABLED,
-                GradientColor = unchecked((int)0x99141212)
-            };
-
-            int accentStructSize = Marshal.SizeOf(accent);
-            IntPtr accentPtr = Marshal.AllocHGlobal(accentStructSize);
-            Marshal.StructureToPtr(accent, accentPtr, false);
-
-            var data = new WindowCompositionAttributeData
-            {
-                Attribute = WindowCompositionAttribute.WCA_ACCENT_POLICY,
-                SizeOfData = accentStructSize,
-                Data = accentPtr
-            };
-
-            SetWindowCompositionAttribute(hwnd, ref data);
-            Marshal.FreeHGlobal(accentPtr);
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct AccentPolicy
-        {
-            public AccentState AccentState;
-            public int AccentFlags;
-            public int GradientColor;
-            public int AnimationId;
-        }
-
-        private enum WindowCompositionAttribute
-        {
-            WCA_ACCENT_POLICY = 19
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct WindowCompositionAttributeData
-        {
-            public WindowCompositionAttribute Attribute;
-            public IntPtr Data;
-            public int SizeOfData;
-        }
-
-        [DllImport("user32.dll")]
-        private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
-
         private readonly AudioService _audioService;
         private readonly MediaService _mediaService;
         private readonly LyricsService _lyricsService;
@@ -116,10 +53,8 @@ namespace WinNotch
         private readonly DispatcherTimer _clockTimer;
         private DispatcherTimer? _volumeHudTimer;
         private Storyboard? _eqStoryboard;
-        private Storyboard? _glassLightStoryboard;
 
         private ViewMode _currentViewMode = ViewMode.IdleCompact;
-        private NotchTheme _currentTheme = NotchTheme.Dark;
         private string _lastMediaKey = string.Empty;
         private bool _isExpanded = false;
         private bool _hasLyrics = false;
@@ -164,7 +99,6 @@ namespace WinNotch
 
             _ = _mediaService.InitializeAsync();
             SwitchViewMode(ViewMode.IdleCompact);
-            ApplyTheme(NotchTheme.Dark);
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -267,7 +201,6 @@ namespace WinNotch
         private void Notch_MouseEnter(object sender, MouseEventArgs e)
         {
             _isExpanded = true;
-            UpdateThemeToggleVisibility();
             if (_volumeHudTimer != null && _volumeHudTimer.IsEnabled) return;
             SwitchViewMode(HasMedia ? ViewMode.MediaExpanded : ViewMode.IdleExpanded);
         }
@@ -276,7 +209,6 @@ namespace WinNotch
         {
             _isExpanded = false;
             _isVolumeAdjusting = false;
-            UpdateThemeToggleVisibility();
             HideVolumeBarExpanded();
             if (_volumeHudTimer != null && _volumeHudTimer.IsEnabled) return;
             SwitchViewMode(HasMedia ? ViewMode.MediaCompact : ViewMode.IdleCompact);
@@ -288,70 +220,6 @@ namespace WinNotch
             int newVol = _audioService.StepVolume(e.Delta > 0 ? step : -step, out bool isMuted);
             ShowVolumeHud(newVol, isMuted);
             e.Handled = true;
-        }
-
-        private void ApplyTheme(NotchTheme theme)
-        {
-            _currentTheme = theme;
-
-            string styleKey = theme == NotchTheme.LiquidGlass ? "LiquidGlassNotchStyle" : "DarkNotchStyle";
-            NotchBorder.Style = (Style)FindResource(styleKey);
-
-            bool isGlass = theme == NotchTheme.LiquidGlass;
-            GlassOverlayLayers.Visibility = isGlass ? Visibility.Visible : Visibility.Collapsed;
-
-            if (isGlass)
-            {
-                StartGlassLightAnimation();
-            }
-            else
-            {
-                StopGlassLightAnimation();
-            }
-
-            ThemeToggleIcon.Fill = new SolidColorBrush(
-                (Color)ColorConverter.ConvertFromString(isGlass ? "#FFD60A" : "#8E8E93"));
-        }
-
-        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
-        {
-            ApplyTheme(_currentTheme == NotchTheme.Dark ? NotchTheme.LiquidGlass : NotchTheme.Dark);
-        }
-
-        private void UpdateThemeToggleVisibility()
-        {
-            bool show = _isExpanded && !_volumeBarVisible;
-
-            DoubleAnimation fade = new DoubleAnimation
-            {
-                To = show ? 1 : 0,
-                Duration = TimeSpan.FromMilliseconds(300)
-            };
-            ThemeToggleButton.BeginAnimation(UIElement.OpacityProperty, fade);
-            ThemeToggleButton.IsHitTestVisible = show;
-        }
-
-        private void StartGlassLightAnimation()
-        {
-            StopGlassLightAnimation();
-
-            var rotateAnim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(9))
-            {
-                RepeatBehavior = RepeatBehavior.Forever
-            };
-            Timeline.SetDesiredFrameRate(rotateAnim, 30);
-
-            _glassLightStoryboard = new Storyboard();
-            _glassLightStoryboard.Children.Add(rotateAnim);
-            Storyboard.SetTarget(rotateAnim, GlassLightRotate);
-            Storyboard.SetTargetProperty(rotateAnim, new PropertyPath(RotateTransform.AngleProperty));
-            _glassLightStoryboard.Begin();
-        }
-
-        private void StopGlassLightAnimation()
-        {
-            _glassLightStoryboard?.Stop();
-            _glassLightStoryboard = null;
         }
 
         private void SetAmbientColor(Color color, Color? secondaryColor = null)
@@ -369,6 +237,12 @@ namespace WinNotch
             RimColorStop1.Color = Color.FromArgb(200, primary.R, primary.G, primary.B);
             RimColorStop2.Color = Color.FromArgb(160, secondary.R, secondary.G, secondary.B);
 
+            // Sync compact equalizer bars to vibrant ambient color
+            var eqBrush = new SolidColorBrush(primary);
+            EqBar1.Background = eqBrush;
+            EqBar2.Background = eqBrush;
+            EqBar3.Background = eqBrush;
+
             if (!_ambientActive)
             {
                 _ambientActive = true;
@@ -380,6 +254,11 @@ namespace WinNotch
         {
             _ambientActive = false;
             StopAmbientBreathAnimation();
+
+            var defaultEq = new SolidColorBrush(Color.FromRgb(255, 159, 10));
+            EqBar1.Background = defaultEq;
+            EqBar2.Background = defaultEq;
+            EqBar3.Background = defaultEq;
 
             var fadeOut = new DoubleAnimation(0, TimeSpan.FromMilliseconds(400));
             NotchAmbientContainer.BeginAnimation(UIElement.OpacityProperty, fadeOut);
@@ -598,14 +477,12 @@ namespace WinNotch
                 new DoubleAnimation { To = 0, Duration = NotchAnimDuration, EasingFunction = NotchAnimEase });
 
             _volumeBarVisible = true;
-            UpdateThemeToggleVisibility();
         }
 
         private void HideVolumeBarExpanded()
         {
             if (!_volumeBarVisible) return;
             _volumeBarVisible = false;
-            UpdateThemeToggleVisibility();
 
             double baseHeight = HasMedia ? 190 : 120;
 
@@ -791,17 +668,11 @@ namespace WinNotch
         {
             ColorToHsl(c, out double h, out double s, out double l);
 
-            // 흑백이거나 채도가 극도로 낮은 경우 (탁한 멍자국 방지: 스타일리시한 네온 바이올렛/블루 톤)
-            if (s < 0.18)
-            {
-                return HslToColor(230, 0.80, 0.56);
-            }
+            // 채도 부스팅: 앰비언트 라이트는 항상 생생하고 선명해야 함
+            double boostedS = Math.Clamp(Math.Max(s * 1.55, 0.82), 0.80, 0.95);
 
-            // 채도 부스팅: 앰비언트 광원은 생생해야 고급스러움
-            double boostedS = Math.Clamp(Math.Max(s * 1.45, 0.78), 0.75, 0.95);
-
-            // 명도 튜닝: 너무 어둡거나 하얗게 날아가지 않고 빛답게 빛나는 최적 구간(0.50 ~ 0.58)
-            double tunedL = Math.Clamp(l, 0.50, 0.58);
+            // 명도 튜닝: 은은하게 발광하는 최적 구간 (0.52 ~ 0.58)
+            double tunedL = Math.Clamp(l, 0.52, 0.58);
 
             return HslToColor(h, boostedS, tunedL);
         }
@@ -810,7 +681,7 @@ namespace WinNotch
         {
             ColorToHsl(primary, out double h, out double s, out double l);
             double shiftedH = (h + hueShiftDegrees) % 360;
-            return HslToColor(shiftedH, Math.Max(0.75, s), Math.Clamp(l * 0.96, 0.46, 0.56));
+            return HslToColor(shiftedH, Math.Max(0.78, s), Math.Clamp(l * 0.96, 0.46, 0.56));
         }
 
         private Color GetDominantColor(BitmapSource bitmap)
@@ -830,44 +701,66 @@ namespace WinNotch
                 byte[] pixels = new byte[height * stride];
                 formatConverted.CopyPixels(pixels, stride, 0);
 
-                double totalWeight = 0;
-                double weightedR = 0, weightedG = 0, weightedB = 0;
+                // 16개 Hue 버킷 (각 22.5도) 히스토그램 클러스터링
+                const int numBuckets = 16;
+                double[] bucketScores = new double[numBuckets];
+                double[] bucketSumR = new double[numBuckets];
+                double[] bucketSumG = new double[numBuckets];
+                double[] bucketSumB = new double[numBuckets];
+                double[] bucketWeights = new double[numBuckets];
 
                 for (int i = 0; i < pixels.Length; i += 4)
                 {
-                    byte pb = pixels[i];
-                    byte pg = pixels[i + 1];
-                    byte pr = pixels[i + 2];
+                    byte b = pixels[i];
+                    byte g = pixels[i + 1];
+                    byte r = pixels[i + 2];
 
-                    int max = Math.Max(pr, Math.Max(pg, pb));
-                    int min = Math.Min(pr, Math.Min(pg, pb));
-                    int delta = max - min;
+                    ColorToHsl(Color.FromRgb(r, g, b), out double h, out double s, out double l);
 
-                    // 극단적인 블랙/화이트 제외하고 채도와 명도에 높은 가중치 부여
-                    if (max > 35 && min < 240)
+                    // 유효한 유색 픽셀 판별 (채도와 명도가 적절한 픽셀)
+                    if (s >= 0.18 && l >= 0.12 && l <= 0.88)
                     {
-                        double weight = (delta * delta) / 1000.0 + (max / 255.0);
-                        weightedR += pr * weight;
-                        weightedG += pg * weight;
-                        weightedB += pb * weight;
-                        totalWeight += weight;
+                        // 채도가 높고 중간 밝기일수록 가중치 부여
+                        double weight = s * s * (1.0 - Math.Abs(l - 0.5) * 1.3);
+                        int bucket = (int)(h / (360.0 / numBuckets)) % numBuckets;
+                        if (bucket < 0) bucket = 0;
+
+                        bucketScores[bucket] += weight;
+                        bucketSumR[bucket] += r * weight;
+                        bucketSumG[bucket] += g * weight;
+                        bucketSumB[bucket] += b * weight;
+                        bucketWeights[bucket] += weight;
                     }
                 }
 
-                if (totalWeight > 0.1)
+                // 가장 점수가 높은 지배적 색상 버킷 선정
+                int bestBucket = -1;
+                double maxScore = 0;
+                for (int b = 0; b < numBuckets; b++)
                 {
-                    Color rawColor = Color.FromRgb(
-                        (byte)Math.Clamp(weightedR / totalWeight, 0, 255),
-                        (byte)Math.Clamp(weightedG / totalWeight, 0, 255),
-                        (byte)Math.Clamp(weightedB / totalWeight, 0, 255));
-                    return EnhanceAmbientColor(rawColor);
+                    if (bucketScores[b] > maxScore)
+                    {
+                        maxScore = bucketScores[b];
+                        bestBucket = b;
+                    }
                 }
 
-                return HslToColor(220, 0.85, 0.55);
+                if (bestBucket >= 0 && bucketWeights[bestBucket] > 0.05)
+                {
+                    Color bestColor = Color.FromRgb(
+                        (byte)Math.Clamp(bucketSumR[bestBucket] / bucketWeights[bestBucket], 0, 255),
+                        (byte)Math.Clamp(bucketSumG[bestBucket] / bucketWeights[bestBucket], 0, 255),
+                        (byte)Math.Clamp(bucketSumB[bestBucket] / bucketWeights[bestBucket], 0, 255));
+
+                    return EnhanceAmbientColor(bestColor);
+                }
+
+                // 흑백 커버일 경우 타이틀 해시 기반 폴백
+                return GenerateFallbackColor(_lastMediaKey);
             }
             catch
             {
-                return Color.FromRgb(74, 144, 226);
+                return GenerateFallbackColor(_lastMediaKey);
             }
         }
 
@@ -1207,10 +1100,6 @@ namespace WinNotch
             });
 
             contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
-            contextMenu.Items.Add("다크 모드", null, (s, e) => ApplyTheme(NotchTheme.Dark));
-            contextMenu.Items.Add("리퀴드 글래스", null, (s, e) => ApplyTheme(NotchTheme.LiquidGlass));
-
-            contextMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             contextMenu.Items.Add("종료", null, (s, e) => TrayExit_Click());
 
             _trayIcon.ContextMenuStrip = contextMenu;
@@ -1230,7 +1119,6 @@ namespace WinNotch
             _clockTimer.Stop();
             _volumeHudTimer?.Stop();
             StopEqualizerAnimation();
-            StopGlassLightAnimation();
             StopAmbientBreathAnimation();
 
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
