@@ -208,6 +208,42 @@
                                        FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
                         </Grid>
 
+                        <!-- Notification Compact -->
+                        <Grid x:Name="NotificationCompactView" Opacity="0" IsHitTestVisible="False"
+                              Margin="14,0,14,0" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="NotifCompactAppText" Grid.Column="0" Text="App"
+                                       Foreground="#0A84FF" FontSize="13.5" FontWeight="Bold"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"
+                                       VerticalAlignment="Center" Margin="0,-2,10,0"/>
+                            <TextBlock x:Name="NotifCompactTitleText" Grid.Column="1" Text="Message"
+                                       Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"
+                                       VerticalAlignment="Center" Margin="0,-2,0,0" TextTrimming="CharacterEllipsis"/>
+                        </Grid>
+
+                        <!-- Notification Expanded -->
+                        <Grid x:Name="NotificationExpandedView" Opacity="0" IsHitTestVisible="False"
+                              Margin="20,16,20,16" VerticalAlignment="Top" HorizontalAlignment="Left">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock x:Name="NotifExpandedAppText" Grid.Row="0" Text="App Name"
+                                       Foreground="#0A84FF" FontSize="12" FontWeight="Bold" Margin="0,0,0,4"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
+                            <TextBlock x:Name="NotifExpandedTitleText" Grid.Row="1" Text="Notification Title"
+                                       Foreground="#FFFFFF" FontSize="15" FontWeight="Bold" TextWrapping="Wrap" MaxHeight="44"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="NotifExpandedBodyText" Grid.Row="2" Text="Body text here..."
+                                       Foreground="#E5FFFFFF" FontSize="13" FontWeight="Medium" TextWrapping="Wrap" MaxHeight="80" TextTrimming="WordEllipsis"
+                                       FontFamily="Segoe UI Variable Display, Segoe UI, -apple-system"/>
+                        </Grid>
+
                         <!-- Idle expanded: big clock -->
                         <StackPanel x:Name="IdleExpandedView" Opacity="0" IsHitTestVisible="False"
                                     VerticalAlignment="Center" HorizontalAlignment="Center">

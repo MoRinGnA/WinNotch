@@ -20,7 +20,7 @@ namespace WinNotch
 {
     public partial class MainWindow : Window
     {
-        private enum ViewMode { IdleCompact, IdleExpanded, MediaCompact, MediaExpanded, VolumeHud }
+        private enum ViewMode { IdleCompact, IdleExpanded, MediaCompact, MediaExpanded, VolumeHud, NotificationCompact, NotificationExpanded }
 
         private const int GWL_EXSTYLE = -20;
         private const int WS_EX_TOOLWINDOW = 0x00000080;
@@ -48,13 +48,17 @@ namespace WinNotch
         private readonly AudioService _audioService;
         private readonly MediaService _mediaService;
         private readonly LyricsService _lyricsService;
+        private readonly BatteryService _batteryService;
+        private readonly NotificationService _notificationService;
 
         private readonly DispatcherTimer _progressTimer;
         private readonly DispatcherTimer _clockTimer;
         private DispatcherTimer? _volumeHudTimer;
+        private DispatcherTimer? _notificationTimer;
         private Storyboard? _eqStoryboard;
 
         private ViewMode _currentViewMode = ViewMode.IdleCompact;
+        private ViewMode _viewModeBeforeNotification = ViewMode.IdleCompact;
         private string _lastMediaKey = string.Empty;
         private bool _isExpanded = false;
         private bool _hasLyrics = false;
@@ -73,6 +77,8 @@ namespace WinNotch
             _audioService = new AudioService();
             _mediaService = new MediaService();
             _lyricsService = new LyricsService();
+            _batteryService = new BatteryService();
+            _notificationService = new NotificationService();
 
             _progressTimer = new DispatcherTimer
             {
@@ -93,11 +99,17 @@ namespace WinNotch
             _mediaService.PlaybackStatusChanged += MediaService_PlaybackStatusChanged;
             _mediaService.TimelineChanged += MediaService_TimelineChanged;
 
+            _batteryService.BatteryStatusChanged += BatteryService_BatteryStatusChanged;
+            _notificationService.NotificationReceived += NotificationService_NotificationReceived;
+
             Closed += MainWindow_Closed;
 
             InitializeTrayIcon();
 
             _ = _mediaService.InitializeAsync();
+            _ = _notificationService.InitializeAsync();
+            _batteryService.Start();
+            
             SwitchViewMode(ViewMode.IdleCompact);
         }
 
@@ -202,6 +214,11 @@ namespace WinNotch
         {
             _isExpanded = true;
             if (_volumeHudTimer != null && _volumeHudTimer.IsEnabled) return;
+            if (_notificationTimer != null && _notificationTimer.IsEnabled)
+            {
+                SwitchViewMode(ViewMode.NotificationExpanded);
+                return;
+            }
             SwitchViewMode(HasMedia ? ViewMode.MediaExpanded : ViewMode.IdleExpanded);
         }
 
@@ -211,6 +228,11 @@ namespace WinNotch
             _isVolumeAdjusting = false;
             HideVolumeBarExpanded();
             if (_volumeHudTimer != null && _volumeHudTimer.IsEnabled) return;
+            if (_notificationTimer != null && _notificationTimer.IsEnabled)
+            {
+                SwitchViewMode(ViewMode.NotificationCompact);
+                return;
+            }
             SwitchViewMode(HasMedia ? ViewMode.MediaCompact : ViewMode.IdleCompact);
         }
 
@@ -341,6 +363,94 @@ namespace WinNotch
             return formattedText.Width;
         }
 
+        private void BatteryService_BatteryStatusChanged(object? sender, BatteryStatusArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                bool isNormal = !e.IsCharging && e.BatteryPercent > 0.20f;
+
+                if (isNormal)
+                {
+                    // Clear battery border modifications and restore style defaults
+                    NotchBorder.ClearValue(Border.BorderBrushProperty);
+                    
+                    // If no media is playing, clear glow. If media is playing, keep media glow.
+                    if (!HasMedia)
+                    {
+                        ClearAmbientLight();
+                    }
+                    return;
+                }
+
+                Color borderColor = e.IsCharging ? Color.FromRgb(57, 255, 20) : Color.FromRgb(255, 59, 48);
+
+                // Music art glow and border takes priority over battery!
+                if (!HasMedia)
+                {
+                    if (e.IsCharging)
+                        SetAmbientColor(borderColor, Color.FromRgb(10, 120, 5));
+                    else
+                        SetAmbientColor(borderColor, Color.FromRgb(150, 15, 10));
+
+                    // Create a LinearGradientBrush to act as a progress bar along the actual Notch border
+                    var gradient = new LinearGradientBrush
+                    {
+                        StartPoint = new Point(0, 0.5),
+                        EndPoint = new Point(1, 0.5)
+                    };
+                    gradient.GradientStops.Add(new GradientStop(borderColor, e.BatteryPercent));
+                    // Use the subtle notch border color (#33FFFFFF) for the unfilled portion so it blends perfectly
+                    gradient.GradientStops.Add(new GradientStop(Color.FromArgb(51, 255, 255, 255), e.BatteryPercent));
+
+                    NotchBorder.BorderBrush = gradient;
+                }
+                else
+                {
+                    // If media is playing, restore normal border
+                    NotchBorder.ClearValue(Border.BorderBrushProperty);
+                }
+            });
+        }
+
+        private void NotificationService_NotificationReceived(object? sender, NotificationEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                NotifCompactAppText.Text = e.AppName;
+                NotifCompactTitleText.Text = string.IsNullOrEmpty(e.Title) ? e.Body : e.Title;
+                
+                NotifExpandedAppText.Text = e.AppName;
+                NotifExpandedTitleText.Text = e.Title;
+                NotifExpandedBodyText.Text = e.Body;
+
+                if (_notificationTimer == null || !_notificationTimer.IsEnabled)
+                {
+                    _viewModeBeforeNotification = _currentViewMode;
+                }
+
+                SwitchViewMode(_isExpanded ? ViewMode.NotificationExpanded : ViewMode.NotificationCompact);
+
+                if (_notificationTimer == null)
+                {
+                    _notificationTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+                    _notificationTimer.Tick += (s, args) =>
+                    {
+                        _notificationTimer.Stop();
+                        if (_isExpanded)
+                        {
+                            SwitchViewMode(HasMedia ? ViewMode.MediaExpanded : ViewMode.IdleExpanded);
+                        }
+                        else
+                        {
+                            SwitchViewMode(HasMedia ? ViewMode.MediaCompact : ViewMode.IdleCompact);
+                        }
+                    };
+                }
+                _notificationTimer.Stop();
+                _notificationTimer.Start();
+            });
+        }
+
         private void SwitchViewMode(ViewMode mode)
         {
             _currentViewMode = mode;
@@ -385,10 +495,27 @@ namespace WinNotch
                     targetRadius = _isExpanded ? 36 : 19;
                     activeView = _isExpanded ? MediaExpandedView : VolumeHudView;
                     break;
+                case ViewMode.NotificationCompact:
+                    targetWidth = Math.Clamp(MeasureTextWidth(NotifCompactAppText.Text, 13.5, FontWeights.Bold) + MeasureTextWidth(NotifCompactTitleText.Text, 13, FontWeights.SemiBold) + 80, 260, 500);
+                    targetHeight = 38;
+                    targetRadius = 19;
+                    activeView = NotificationCompactView;
+                    break;
+                case ViewMode.NotificationExpanded:
+                    targetWidth = 360;
+                    targetHeight = 160;
+                    targetRadius = 32;
+                    activeView = NotificationExpandedView;
+                    break;
             }
 
             SetViewActive(activeView, duration, ease);
             NotchBorder.CornerRadius = new CornerRadius(targetRadius);
+
+            if (mode != ViewMode.IdleCompact)
+            {
+                NotchBorder.ClearValue(Border.BorderBrushProperty);
+            }
 
             DoubleAnimation widthAnim = new DoubleAnimation { To = targetWidth, Duration = duration, EasingFunction = ease };
             DoubleAnimation heightAnim = new DoubleAnimation { To = targetHeight, Duration = duration, EasingFunction = ease };
@@ -408,7 +535,7 @@ namespace WinNotch
 
         private void SetViewActive(UIElement activeView, Duration duration, IEasingFunction ease)
         {
-            UIElement[] views = { VolumeHudView, IdleCompactView, IdleExpandedView, MediaCompactView, MediaExpandedView };
+            UIElement[] views = { VolumeHudView, IdleCompactView, IdleExpandedView, MediaCompactView, MediaExpandedView, NotificationCompactView, NotificationExpandedView };
             Duration fadeOutDuration = new Duration(TimeSpan.FromMilliseconds(150));
 
             foreach (var view in views)
@@ -1127,6 +1254,8 @@ namespace WinNotch
             _audioService.Dispose();
             _mediaService.Dispose();
             _lyricsService.Dispose();
+            _batteryService.Dispose();
+            _notificationService.Dispose();
         }
     }
 }
