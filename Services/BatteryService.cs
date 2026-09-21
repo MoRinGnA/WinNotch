@@ -66,6 +66,14 @@ namespace WinNotch.Services
             }
         }
 
+        public void ForceUpdate()
+        {
+            if (_lastPercent >= 0)
+            {
+                BatteryStatusChanged?.Invoke(this, new BatteryStatusArgs(_lastPercent, _lastChargingStatus));
+            }
+        }
+
         public void Dispose()
         {
             _timer.Stop();

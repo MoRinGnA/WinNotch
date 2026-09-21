@@ -175,21 +175,15 @@ namespace WinNotch
 
         private void ShowClipboardToast(string text)
         {
-            CompactTitleText.Text = "\U0001f4cb 복사됨";
-            CompactLyricText.Text = text.Length > 20 ? text.Substring(0, 20) + "..." : text;
-            SwitchViewMode(ViewMode.MediaCompact);
+            NotifCompactAppText.Text = "\U0001f4cb 복사됨";
+            NotifCompactTitleText.Text = text.Length > 20 ? text.Substring(0, 20) + "..." : text;
+            SwitchViewMode(ViewMode.NotificationCompact);
 
             Task.Delay(3000).ContinueWith(_ =>
             {
                 Dispatcher.Invoke(() =>
                 {
                     SwitchViewMode(HasMedia ? ViewMode.MediaCompact : ViewMode.IdleCompact);
-                    if (HasMedia)
-                    {
-                        string[] parts = _lastMediaKey.Split(new[] { ":::" }, StringSplitOptions.None);
-                        if (parts.Length > 1) CompactTitleText.Text = parts[1];
-                        CompactLyricText.Text = "";
-                    }
                 });
             });
         }
@@ -516,6 +510,10 @@ namespace WinNotch
             {
                 NotchBorder.ClearValue(Border.BorderBrushProperty);
             }
+            else
+            {
+                _batteryService.ForceUpdate();
+            }
 
             DoubleAnimation widthAnim = new DoubleAnimation { To = targetWidth, Duration = duration, EasingFunction = ease };
             DoubleAnimation heightAnim = new DoubleAnimation { To = targetHeight, Duration = duration, EasingFunction = ease };
@@ -795,11 +793,11 @@ namespace WinNotch
         {
             ColorToHsl(c, out double h, out double s, out double l);
 
-            // 채도 부스팅: 앰비언트 라이트는 항상 생생하고 선명해야 함
-            double boostedS = Math.Clamp(Math.Max(s * 1.55, 0.82), 0.80, 0.95);
+            // 원본 앨범의 색감을 최대한 유지하면서 앰비언트 느낌만 주도록 부스팅
+            double boostedS = Math.Clamp(s * 1.3, 0.40, 0.95);
 
-            // 명도 튜닝: 은은하게 발광하는 최적 구간 (0.52 ~ 0.58)
-            double tunedL = Math.Clamp(l, 0.52, 0.58);
+            // 명도를 너무 심하게 좁은 구간으로 뭉개지 않고, 고유의 밝기를 살려줌
+            double tunedL = Math.Clamp(l * 1.15, 0.35, 0.75);
 
             return HslToColor(h, boostedS, tunedL);
         }
